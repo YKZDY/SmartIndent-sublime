@@ -18,13 +18,13 @@ class SmartIndentSettings(object):
         return self.settings.get("extensions") or default_exts
     @property
     def indent_size(self):
-        return self.settings.get("indent_size") or 4
+        return self.settings.get("indent_size", 4)
     @property
     def tab_size(self):
-        return self.settings.get("tab_size") or 8
+        return self.settings.get("tab_size", 8)
     @property
     def translate_spaces_to_tabs(self):
-        return self.settings.get("translate_spaces_to_tabs") or True
+        return self.settings.get("translate_spaces_to_tabs", True)
 
 
 class SmartIndentReplaceCommand(sublime_plugin.TextCommand):
