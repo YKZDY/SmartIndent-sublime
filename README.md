@@ -1,4 +1,4 @@
-# SmartIndent
+# Smart Indent
 The package allows user separately control `Indent Size` and `Tab Size` in Sublime Text.
 
 ### Settings
