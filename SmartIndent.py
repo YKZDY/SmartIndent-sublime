@@ -33,13 +33,13 @@ class SmartIndentReplaceCommand(sublime_plugin.TextCommand):
 
         # Must traverse selection here for supporting multi-editing
         for region in self.view.sel():
-            # Replace inputted tab to four spaces
+            # Replace inputted tab to spaces
             point = region.begin()
             tab_region = sublime.Region(region.begin()-1, region.begin())
             if self.view.substr(tab_region) == "\t":
                 self.view.replace(edit, tab_region, " "*settings.indent_size)
 
-            # Replace continuous eight spaces to tab
+            # Replace continuous spaces to tab
             if settings.translate_spaces_to_tabs:
                 line = self.view.line(point)
                 line_buffer = self.view.substr(line)
@@ -70,6 +70,11 @@ class SmartIndentListener(sublime_plugin.EventListener):
 
     def on_load(self, view):
         self.initialize(view)
+
+    def on_text_command(self, view, cmd, args):
+        if self._trigger and cmd == "undo":
+            if view.command_history(0)[0] == "smart_indent_replace":
+                view.run_command("undo")
 
     def on_post_text_command(self, view, cmd, args):
         if self._trigger:
