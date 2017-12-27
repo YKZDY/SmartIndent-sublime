@@ -70,6 +70,9 @@ class SmartIndentListener(sublime_plugin.EventListener):
 
     def on_load(self, view):
         self.initialize(view)
+        
+    def on_activated(self, view):
+        self.initialize(view)
 
     def on_text_command(self, view, cmd, args):
         if self._trigger and cmd == "undo":
