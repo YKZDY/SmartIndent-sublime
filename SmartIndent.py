@@ -31,7 +31,6 @@ class SmartIndentReplaceCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         settings = SmartIndentSettings()
 
-        # Must traverse selection here for supporting multi-editing
         for region in self.view.sel():
             # Replace inputted tab to spaces
             point = region.begin()
@@ -43,8 +42,33 @@ class SmartIndentReplaceCommand(sublime_plugin.TextCommand):
             if settings.translate_spaces_to_tabs:
                 line = self.view.line(point)
                 line_buffer = self.view.substr(line)
-                line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
+                line_buffer = re.sub(r" "*settings.tab_size, "\t", line_buffer)
                 self.view.replace(edit, line, line_buffer)
+
+
+class SmartIndentLinesCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        settings = SmartIndentSettings()
+
+        for region in self.view.sel():
+            lines_buffer = list()
+            for line in self.view.lines(region):
+                # Replace the first tab to spaces on each line.
+                line_buffer = self.view.substr(line)[1:]
+                line_buffer = line_buffer.replace(line_buffer.lstrip("\t"),
+                    " "*settings.indent_size + line_buffer.lstrip("\t"))
+
+                # Replace continuous spaces to tab.
+                if settings.translate_spaces_to_tabs:
+                    line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
+                lines_buffer.append(line_buffer)
+
+            self.view.replace(edit, region, "\n".join(lines_buffer))
+
+            # Fix the unknown tab error on the beginning of every region.
+            tab_region = sublime.Region(region.begin()-1, region.begin())
+            if self.view.substr(tab_region) == "\t":
+                self.view.erase(edit, tab_region)
 
 
 class SmartIndentListener(sublime_plugin.EventListener):
@@ -76,7 +100,8 @@ class SmartIndentListener(sublime_plugin.EventListener):
 
     def on_text_command(self, view, cmd, args):
         if self._trigger and cmd == "undo":
-            if view.command_history(0)[0] == "smart_indent_replace":
+            if view.command_history(0)[0] in ("smart_indent_replace",
+                "smart_indent_lines"):
                 view.run_command("undo")
 
     def on_post_text_command(self, view, cmd, args):
@@ -90,3 +115,6 @@ class SmartIndentListener(sublime_plugin.EventListener):
 
             if cmd == "insert" and args["characters"] == "\n":
                 view.run_command("smart_indent_replace")
+
+            if cmd == "indent":
+                view.run_command("smart_indent_lines")
