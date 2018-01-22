@@ -64,11 +64,55 @@ class SmartIndentLinesCommand(sublime_plugin.TextCommand):
                 lines_buffer.append(line_buffer)
 
             self.view.replace(edit, region, "\n".join(lines_buffer))
-
             # Fix the unknown tab error on the beginning of every region.
             tab_region = sublime.Region(region.begin()-1, region.begin())
             if self.view.substr(tab_region) == "\t":
                 self.view.erase(edit, tab_region)
+
+
+class PreSmartUnindentCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            lines_buffer = list()
+            for line in self.view.lines(region):
+                # Disable default unindent command by adding a tab.
+                line_buffer = "\t" + self.view.substr(line)
+                lines_buffer.append(line_buffer)
+
+            if region.empty():
+                region = self.view.line(region)
+            self.view.replace(edit, region, "\n".join(lines_buffer))
+
+
+class PostSmartUnindentCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        def _unindent(src, tabSize, indentSize):
+            if indentSize == 0:
+                return src
+            elif indentSize > 0:
+                if src.startswith(" "):
+                    return _unindent(src[1:], tabSize, indentSize-1)
+                elif src.startswith("\t"):
+                    return _unindent(src[1:], tabSize, indentSize-tabSize)
+                else:
+                    return src
+            elif indentSize < 0:
+                return src.replace(src.lstrip("\t"), " "*abs(indentSize) + src.lstrip("\t"))
+
+        settings = SmartIndentSettings()
+
+        for region in self.view.sel():
+            lines_buffer = list()
+            for line in self.view.lines(region):
+                # Replace the first tab to spaces on each line.
+                line_buffer = self.view.substr(line)
+                line_buffer = _unindent(line_buffer, settings.tab_size, settings.indent_size)
+                line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
+                lines_buffer.append(line_buffer)
+
+            if region.empty():
+                region = self.view.line(region)
+            self.view.replace(edit, region, "\n".join(lines_buffer))
 
 
 class SmartIndentListener(sublime_plugin.EventListener):
@@ -99,22 +143,33 @@ class SmartIndentListener(sublime_plugin.EventListener):
         self.initialize(view)
 
     def on_text_command(self, view, cmd, args):
-        if self._trigger and cmd == "undo":
-            if view.command_history(0)[0] in ("smart_indent_replace",
-                "smart_indent_lines"):
-                view.run_command("undo")
+        if self._trigger:
+            if cmd == "undo":
+                if view.command_history(0)[0] in ("smart_indent_replace",
+                    "smart_indent_lines"):
+                    view.run_command("undo")
+
+                elif view.command_history(0)[0] == "post_smart_unindent":
+                    view.run_command("undo")
+                    view.run_command("undo")
+
+            elif cmd == "unindent":
+                view.run_command("pre_smart_unindent")
 
     def on_post_text_command(self, view, cmd, args):
         if self._trigger:
             if cmd in ("reindent", "insert_best_completion"):
                 view.run_command("smart_indent_replace")
 
-            if cmd == "run_macro_file" and args["file"] == \
+            elif cmd == "run_macro_file" and args["file"] == \
                 "res://Packages/Default/Add Line in Braces.sublime-macro":
                 view.run_command("smart_indent_replace")
 
-            if cmd == "insert" and args["characters"] == "\n":
+            elif cmd == "insert" and args["characters"] == "\n":
                 view.run_command("smart_indent_replace")
 
-            if cmd == "indent":
+            elif cmd == "indent":
                 view.run_command("smart_indent_lines")
+
+            elif cmd == "unindent":
+                view.run_command("post_smart_unindent")
