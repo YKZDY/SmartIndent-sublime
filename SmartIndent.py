@@ -104,7 +104,7 @@ class PostSmartUnindentCommand(sublime_plugin.TextCommand):
         for region in self.view.sel():
             lines_buffer = list()
             for line in self.view.lines(region):
-                # Replace the first tab to spaces on each line.
+                # Unindent then replace continuous spaces to tab.
                 line_buffer = self.view.substr(line)
                 line_buffer = _unindent(line_buffer, settings.tab_size, settings.indent_size)
                 line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
