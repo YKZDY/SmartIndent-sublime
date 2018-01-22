@@ -7,6 +7,20 @@ import sublime
 import sublime_plugin
 
 
+def SetLinesAtRegion(edit, view, region, lines):
+    is_empty = region.empty()
+    is_endswithline = view.substr(sublime.Region(region.end()-1, region.end())) == "\n"
+
+    if is_endswithline:
+        region = sublime.Region(region.begin(), region.end()-1)
+    region = view.full_line(region)
+
+    if not is_empty:
+        view.sel().add(region)
+
+    view.replace(edit, region, "\n".join(lines) + "\n")
+
+
 class SmartIndentSettings(object):
     def __init__(self):
         super(SmartIndentSettings, self).__init__()
@@ -34,9 +48,9 @@ class SmartIndentReplaceCommand(sublime_plugin.TextCommand):
         for region in self.view.sel():
             # Replace inputted tab to spaces
             point = region.begin()
-            tab_region = sublime.Region(region.begin()-1, region.begin())
-            if self.view.substr(tab_region) == "\t":
-                self.view.replace(edit, tab_region, " "*settings.indent_size)
+            input_region = sublime.Region(region.begin()-1, region.begin())
+            if self.view.substr(input_region) == "\t":
+                self.view.replace(edit, input_region, " "*settings.indent_size)
 
             # Replace continuous spaces to tab
             if settings.translate_spaces_to_tabs:
@@ -53,25 +67,21 @@ class SmartIndentLinesCommand(sublime_plugin.TextCommand):
         for region in self.view.sel():
             lines_buffer = list()
             for line in self.view.lines(region):
-                line_buffer = self.view.substr(line)
+                line_buffer = self.view.substr(line)[1:]
                 if not line_buffer.strip():
-                    lines_buffer.append("")
+                    lines_buffer.append(line_buffer)
                     continue
 
                 # Replace the first tab to spaces on each line.
                 line_buffer = line_buffer.replace(line_buffer.lstrip("\t"),
-                    " "*settings.indent_size + line_buffer.lstrip("\t"))[1:]
+                    " "*settings.indent_size + line_buffer.lstrip("\t"))
 
                 # Replace continuous spaces to tab.
                 if settings.translate_spaces_to_tabs:
                     line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
                 lines_buffer.append(line_buffer)
 
-            self.view.replace(edit, region, "\n".join(lines_buffer))
-            # Fix the unknown tab error on the beginning of every region.
-            tab_region = sublime.Region(region.begin()-1, region.begin())
-            if self.view.substr(tab_region) == "\t":
-                self.view.erase(edit, tab_region)
+            SetLinesAtRegion(edit, self.view, region, lines_buffer)
 
 
 class PreSmartUnindentCommand(sublime_plugin.TextCommand):
@@ -83,9 +93,7 @@ class PreSmartUnindentCommand(sublime_plugin.TextCommand):
                 line_buffer = "\t" + self.view.substr(line)
                 lines_buffer.append(line_buffer)
 
-            if region.empty():
-                region = self.view.line(region)
-            self.view.replace(edit, region, "\n".join(lines_buffer))
+            SetLinesAtRegion(edit, self.view, region, lines_buffer)
 
 
 class PostSmartUnindentCommand(sublime_plugin.TextCommand):
@@ -110,7 +118,7 @@ class PostSmartUnindentCommand(sublime_plugin.TextCommand):
             for line in self.view.lines(region):
                 line_buffer = self.view.substr(line)
                 if not line_buffer.strip():
-                    lines_buffer.append("")
+                    lines_buffer.append(line_buffer)
                     continue
 
                 # Unindent then replace continuous spaces to tab.
@@ -118,9 +126,7 @@ class PostSmartUnindentCommand(sublime_plugin.TextCommand):
                 line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
                 lines_buffer.append(line_buffer)
 
-            if region.empty():
-                region = self.view.line(region)
-            self.view.replace(edit, region, "\n".join(lines_buffer))
+            SetLinesAtRegion(edit, self.view, region, lines_buffer)
 
 
 class SmartIndentListener(sublime_plugin.EventListener):
