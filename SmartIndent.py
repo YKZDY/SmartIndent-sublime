@@ -53,10 +53,14 @@ class SmartIndentLinesCommand(sublime_plugin.TextCommand):
         for region in self.view.sel():
             lines_buffer = list()
             for line in self.view.lines(region):
+                line_buffer = self.view.substr(line)
+                if not line_buffer.strip():
+                    lines_buffer.append("")
+                    continue
+
                 # Replace the first tab to spaces on each line.
-                line_buffer = self.view.substr(line)[1:]
                 line_buffer = line_buffer.replace(line_buffer.lstrip("\t"),
-                    " "*settings.indent_size + line_buffer.lstrip("\t"))
+                    " "*settings.indent_size + line_buffer.lstrip("\t"))[1:]
 
                 # Replace continuous spaces to tab.
                 if settings.translate_spaces_to_tabs:
@@ -104,8 +108,12 @@ class PostSmartUnindentCommand(sublime_plugin.TextCommand):
         for region in self.view.sel():
             lines_buffer = list()
             for line in self.view.lines(region):
-                # Unindent then replace continuous spaces to tab.
                 line_buffer = self.view.substr(line)
+                if not line_buffer.strip():
+                    lines_buffer.append("")
+                    continue
+
+                # Unindent then replace continuous spaces to tab.
                 line_buffer = _unindent(line_buffer, settings.tab_size, settings.indent_size)
                 line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
                 lines_buffer.append(line_buffer)
