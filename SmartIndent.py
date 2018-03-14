@@ -10,9 +10,13 @@ import sublime_plugin
 def SetLinesAtRegion(edit, view, region, lines):
     is_empty = region.empty()
     is_endswithline = view.substr(sublime.Region(region.end()-1, region.end())) == "\n"
+    is_startswithline = view.substr(sublime.Region(region.begin()-1, region.begin())) == "\n"
 
     if is_endswithline:
         region = sublime.Region(region.begin(), region.end()-1)
+    if is_startswithline:
+        region = sublime.Region(region.begin()+1, region.end())
+
     region = view.full_line(region)
 
     if not is_empty:
@@ -109,6 +113,8 @@ class PostSmartUnindentCommand(sublime_plugin.TextCommand):
                 else:
                     return src
             elif indentSize < 0:
+                if not src.strip():
+                    return src + " "*abs(indentSize)
                 return src.replace(src.lstrip("\t"), " "*abs(indentSize) + src.lstrip("\t"))
 
         settings = SmartIndentSettings()
@@ -117,13 +123,11 @@ class PostSmartUnindentCommand(sublime_plugin.TextCommand):
             lines_buffer = list()
             for line in self.view.lines(region):
                 line_buffer = self.view.substr(line)
-                if not line_buffer.strip():
-                    lines_buffer.append(line_buffer)
-                    continue
-
-                # Unindent then replace continuous spaces to tab.
                 line_buffer = _unindent(line_buffer, settings.tab_size, settings.indent_size)
-                line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
+
+                # Replace continuous spaces to tab.
+                if settings.translate_spaces_to_tabs:
+                    line_buffer = re.sub(" "*settings.tab_size, "\t", line_buffer)
                 lines_buffer.append(line_buffer)
 
             SetLinesAtRegion(edit, self.view, region, lines_buffer)
